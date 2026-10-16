@@ -29,12 +29,22 @@ policy:
     mcore_generation_config:
       refit_backend: nccl
       transformer_impl: inference_optimized
-      inference_grouped_gemm_backend: torch
+      # Only flashinfer runs MXFP8 experts on the TRT-LLM routed MoE kernels;
+      # torch and vllm both fall back to MCore's fused-MoE path for MXFP8.
+      inference_grouped_gemm_backend: flashinfer
+      # Without this bound FlashInfer's routed MXFP8 MoE runs every decode step over the full
+      # 65,536-row NVLS buffer (44 s/step instead of 9 s). MCore engages it only when
+      # max_requests * (num_speculative_tokens + 1) * EP <= capacity, with max_requests derived from
+      # the KV pool and the Mamba-state budget (about 40 here); 1024 leaves headroom, and the worker
+      # raises at startup if the bound cannot engage. Needs >= 256 rows at EP8 for CUDA-graph capture.
+      inference_flashinfer_mxfp8_token_capacity: 1024
       inference_moe_token_dispatcher_type: nvls
       tensor_model_parallel_size: 2
       expert_model_parallel_size: 8
       sequence_parallel: true
       logprobs_mode: raw_logprobs
+      # The checkpoint declares mamba_ssm_cache_dtype=float32; bf16 SSM state can overflow.
+      mamba_inference_ssm_states_dtype: float32
       fp8_cfg:
         enabled: true
         fp8: e4m3

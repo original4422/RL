@@ -280,3 +280,46 @@ def test_policy_level_refit_offload_key_passes():
             }
         }
     )
+
+
+# ============================================================================
+# reject_outdated_mcore_memory_keys
+# ============================================================================
+
+
+def test_removed_mcore_memory_keys_are_rejected_and_current_keys_pass():
+    """Each removed key names its replacement; the first one in the block is reported first."""
+    removed = {"buffer_guaranteed_fraction": 0.1, "unified_memory_level": 0}
+    for key, replacement in (
+        ("buffer_guaranteed_fraction", "paused_buffer_size_gb"),
+        ("unified_memory_level", "kv_cache_management_mode"),
+    ):
+        with pytest.raises(
+            ValueError,
+            match=rf"policy\.generation\.mcore_generation_config\.{key}.*{replacement}",
+        ):
+            check_outdated_config(
+                {
+                    "policy": {
+                        "generation": {"mcore_generation_config": {key: removed[key]}}
+                    }
+                }
+            )
+
+    with pytest.raises(ValueError, match="buffer_guaranteed_fraction"):
+        check_outdated_config(
+            {"policy": {"generation": {"mcore_generation_config": removed}}}
+        )
+
+    check_outdated_config(
+        {
+            "policy": {
+                "generation": {
+                    "mcore_generation_config": {
+                        "buffer_size_gb": 10,
+                        "kv_cache_management_mode": "persist",
+                    }
+                }
+            }
+        }
+    )

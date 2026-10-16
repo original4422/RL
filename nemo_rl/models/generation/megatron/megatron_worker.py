@@ -659,8 +659,12 @@ class MegatronGenerationMixin:
             "static_kv_memory_pointers": needs_static_kv_pointers,
             "use_cuda_graphs_for_non_decode_steps": use_cuda_graphs_for_non_decode_steps,
             "use_flashinfer_fused_rope": use_flashinfer_fused_rope,
+            # FlashInfer sampling kernels, NeMo-RL's choice since #2355; MCore defaults
+            # to "torch" and runs this sampler eagerly outside CUDA graphs.
             "sampling_backend": "flashinfer",
-            "use_synchronous_zmq_collectives": True,
+            "use_synchronous_zmq_collectives": mcore_generation_config[
+                "use_synchronous_zmq_collectives"
+            ],
             "materialize_only_last_token_logits": materialize_only_last_token_logits,
             "enable_chunked_prefill": enable_chunked_prefill,
             "enable_prefix_caching": mcore_generation_config["enable_prefix_caching"],
@@ -691,6 +695,33 @@ class MegatronGenerationMixin:
         self.inference_context = DynamicInferenceContext(
             engine_model.config, inference_config
         )
+        print(
+            f"[Rank {self.rank}] Megatron inference context: "
+            f"max_requests={self.inference_context.max_requests}, "
+            f"max_tokens={self.inference_context.max_tokens}"
+        )
+        # MCore bounds FlashInfer's MXFP8 decode rows only when every decode step fits the
+        # capacity; otherwise the key is inert and decode silently runs over the full
+        # dispatcher buffer (about 5x slower), so refuse that configuration up front.
+        token_capacity = model_config.inference_flashinfer_mxfp8_token_capacity
+        if token_capacity is not None:
+            decode_rows = (
+                self.inference_context.max_requests
+                * (num_speculative_tokens + 1)
+                * model_config.expert_model_parallel_size
+            )
+            if decode_rows > token_capacity:
+                raise ValueError(
+                    "policy.generation.mcore_generation_config."
+                    f"inference_flashinfer_mxfp8_token_capacity={token_capacity} can never "
+                    "engage: MCore applies it only when max_requests * "
+                    "(num_speculative_tokens + 1) * expert_model_parallel_size <= capacity, "
+                    f"and this engine derived max_requests="
+                    f"{self.inference_context.max_requests} with EP="
+                    f"{model_config.expert_model_parallel_size}, i.e. {decode_rows} decode "
+                    "rows. Raise the capacity (it may go up to the full dispatcher buffer) "
+                    "or lower buffer_size_gb / max_requests."
+                )
         if media_model is None:
             self.inference_wrapped_model = GPTInferenceWrapper(
                 engine_model, self.inference_context

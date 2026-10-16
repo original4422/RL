@@ -1367,6 +1367,17 @@ def _apply_moe_config(model_cfg: Any, config: PolicyConfig) -> None:
     ):
         model_cfg.moe_router_num_groups = None
         model_cfg.moe_router_group_topk = None
+    if (
+        config["megatron_cfg"].get("transformer_impl") == "inference_optimized"
+        and getattr(model_cfg, "num_moe_experts", None)
+        and model_cfg.moe_router_dtype != "fp32"
+    ):
+        raise ValueError(
+            "transformer_impl=inference_optimized requires moe_router_dtype='fp32' on "
+            f"MoE models (got {model_cfg.moe_router_dtype!r}). Set policy.generation."
+            "mcore_generation_config.moe_router_dtype=fp32 for the generation model, "
+            "or policy.megatron_cfg.moe_router_dtype=fp32 for training too."
+        )
     if "moe_pad_experts_for_cuda_graph_inference" in config["megatron_cfg"]:
         model_cfg.moe_pad_experts_for_cuda_graph_inference = config["megatron_cfg"][
             "moe_pad_experts_for_cuda_graph_inference"

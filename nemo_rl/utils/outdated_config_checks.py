@@ -139,6 +139,40 @@ def reject_outdated_mcore_refit_offload_key(config: dict[str, Any]) -> None:
         )
 
 
+def reject_outdated_mcore_memory_keys(config: dict[str, Any]) -> None:
+    """Fail when a removed Megatron-generation KV-pool memory key is present.
+
+    Both keys sat next to each other in the shipped exemplars, so a config copied
+    from one usually carries both; they are reported in that order.
+
+    Args:
+        config: The config as the user wrote it, resolved to plain dicts.
+    """
+    policy = config.get("policy")
+    if not isinstance(policy, dict):
+        return
+    generation = policy.get("generation")
+    if not isinstance(generation, dict):
+        return
+    mcore_generation = generation.get("mcore_generation_config")
+    if not isinstance(mcore_generation, dict):
+        return
+    if "buffer_guaranteed_fraction" in mcore_generation:
+        raise ValueError(
+            "policy.generation.mcore_generation_config.buffer_guaranteed_fraction was "
+            "removed: Megatron-Core replaced it with paused_buffer_size_gb and NeMo-RL "
+            "stopped forwarding it in PR #1902. Delete the key; buffer_size_gb alone "
+            "sizes the KV pool."
+        )
+    if "unified_memory_level" in mcore_generation:
+        raise ValueError(
+            "policy.generation.mcore_generation_config.unified_memory_level was "
+            "removed: NeMo-RL stopped forwarding it to Megatron-Core in PR #2355, so "
+            "it had no effect. Delete the key; kv_cache_management_mode controls KV "
+            "cache placement across suspend/resume."
+        )
+
+
 def check_outdated_config(config: dict[str, Any]) -> None:
     """Fail fast on config the code no longer accepts, naming the migration to apply.
 
@@ -154,3 +188,4 @@ def check_outdated_config(config: dict[str, Any]) -> None:
     reject_outdated_dataset_config(config)
     reject_outdated_metric_name_format(config)
     reject_outdated_mcore_refit_offload_key(config)
+    reject_outdated_mcore_memory_keys(config)

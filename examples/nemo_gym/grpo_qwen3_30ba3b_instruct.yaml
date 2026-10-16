@@ -76,11 +76,11 @@ policy:
       cuda_graph_max_tokens: 512
       inference_cuda_graph_scope: "block"
       buffer_size_gb: 10
-      num_cuda_graphs: 4
+      num_cuda_graphs: -1
       block_size_tokens: 256
       use_cuda_graphs_for_non_decode_steps: true
       enable_chunked_prefill: true
-      enable_prefix_caching: false
+      enable_prefix_caching: true
       prefix_caching_mamba_gb: null
       prefix_caching_eviction_policy: lru
       prefix_caching_coordinator_policy: longest_prefix
@@ -93,6 +93,7 @@ policy:
       refit_backend: null  # Native MCore copy-service backend, used only when refit_transport="mcore". Options: "gloo", "nccl", or "nccl_m2n" ("nvshmem" is currently broken, see https://github.com/NVIDIA-NeMo/RL/issues/3646).
       refit_execution_batch_bytes: null  # Native MCore refit staging limit. null matches NeMo-RL's collective default (2% of total GPU memory, capped at 5 GiB); set a positive byte count to override.
       logprobs_mode: processed_logprobs
+      use_synchronous_zmq_collectives: true  # Synchronous engine collectives; MCore default is false. Reduces step-time variability on MoE models.
       parsers: []
       expose_http_server: false
       http_server_num_replicas: 8

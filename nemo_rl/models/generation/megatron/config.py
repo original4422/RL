@@ -122,8 +122,10 @@ class MCoreGenerationSpecificArgs(TypedDict):
     refit_execution_batch_bytes: int | None
     num_speculative_tokens: int
 
-    mamba_inference_ssm_states_dtype: NotRequired[str]
-    mamba_inference_conv_states_dtype: NotRequired[str]
+    # Hybrid (Mamba) inference state dtypes; None keeps the model dtype. Match the
+    # checkpoint's mamba_ssm_cache_dtype (Nemotron-H checkpoints declare float32).
+    mamba_inference_ssm_states_dtype: NotRequired[str | None]
+    mamba_inference_conv_states_dtype: NotRequired[str | None]
     # GPU budget for cached Mamba states; null disables it (MCore default).
     prefix_caching_mamba_gb: NotRequired[float | None]
 
@@ -180,6 +182,10 @@ class MCoreGenerationSpecificArgs(TypedDict):
     # processors. Policy recomputation uses raw model logits, so numerical
     # parity checks should select raw_logprobs explicitly.
     logprobs_mode: Literal["processed_logprobs", "raw_logprobs"]
+
+    # Synchronous ZMQ collectives for the engine's all-reduce. MCore defaults to
+    # False; True trades a little latency for less step-time variability on MoE.
+    use_synchronous_zmq_collectives: bool
 
     # FP8/MXFP8 for the dedicated (non-colocated) inference model;
     # merged into its `megatron_cfg` by `merged_inference_megatron_cfg`.

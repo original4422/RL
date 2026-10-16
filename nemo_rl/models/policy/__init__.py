@@ -454,7 +454,9 @@ class MegatronConfig(TypedDict):
     # Options are 'nvls' (requires Hopper+ NVLink) and 'nccl' (fallback for non-NVLS systems).
     inference_moe_token_dispatcher_type: NotRequired[str]
     # Backend for grouped-GEMM during inference-optimized MoE forward.
-    # Options: 'flashinfer', 'torch', 'vllm' (mcore default).
+    # Options: 'flashinfer', 'torch', 'vllm' (mcore default). Only 'flashinfer' runs
+    # MXFP8 experts on the TRT-LLM kernels; 'torch' and 'vllm' both take MCore's
+    # fused-MoE path for MXFP8 layers.
     inference_grouped_gemm_backend: NotRequired[str]
     # Fixed decode row capacity for the FlashInfer routed-MXFP8 MoE path. Without it
     # every decode step processes the full NVLS dispatcher buffer
